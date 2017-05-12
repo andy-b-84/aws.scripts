@@ -10,6 +10,7 @@ if hasattr(ssl, '_create_unverified_context'):
     ssl._create_default_https_context = ssl._create_unverified_context
 
 class bcolors:
+    LIGHT_CYAN = '\033[96m'
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
     LIGHT_GREEN = '\033[92m'
@@ -26,11 +27,11 @@ def usage():
     print '  ./s3.acl.put.public.py <bucket> -p <prefix> -i <access_key_id> -k <secret_access_key>'
     print '  browse every file in <bucket> to add a "PUBLIC_READ" ACL on them.'
     print bcolors.YELLOW + 'Arguments:' + bcolors.ENDC
-    print '  ' + bcolors.LIGHT_GREEN + 'bucket' + bcolors.ENDC + "\t\t\tThe bucket to browse"
+    print '  bucket' + bcolors.ENDC + "\t\t\tThe bucket to browse"
     print bcolors.YELLOW + 'Options:' + bcolors.ENDC
-    print '  ' + bcolors.LIGHT_GREEN + '-p|--prefix' + bcolors.ENDC + "\t\t\tprefix objects must have in their keys (folder name if S3 was seen as a FS)"
-    print '  ' + bcolors.LIGHT_GREEN + '-i|--access_key_id' + bcolors.ENDC
-    print '  ' + bcolors.LIGHT_GREEN + '-k|--secret_access_key' + bcolors.ENDC
+    print '  -p|--prefix\t\t\tprefix objects must have in their keys (folder name if S3 was seen as a FS)'
+    print '  -i|--access_key_id\t\tboth -i and -k must be set at the same time, or none'
+    print '  -k|--secret_access_key\tboth -i and -k must be set at the same time, or none'
 
 def main(bucket_name, argv):
     try:
@@ -39,7 +40,10 @@ def main(bucket_name, argv):
         usage()
         sys.exit(2)
 
-    print bucket_name
+    if bucket_name in ('-h', '--help'):
+        usage()
+        sys.exit(0)
+
     access_key_id = ''
     secret_access_key = ''
     prefix = ''
@@ -65,8 +69,9 @@ def main(bucket_name, argv):
     if secret_access_key != '':
         client = boto3.client(
             's3',
-            access_key_id,
-            secret_access_key
+            aws_access_key_id = access_key_id,
+            aws_secret_access_key = secret_access_key,
+            region_name = 'eu-west-1'
         )
         """ :type : pyboto3.s3 """
     else:
@@ -90,18 +95,22 @@ def main(bucket_name, argv):
             #MaxKeys=10
         )
         for content in files['Contents']:
-            lastKey = content['Key']
+            lastKey = content['Key'].replace(' ', '+')
+            print lastKey
             total += 1
-            object = s3.Object(bucket_name, lastKey)
-            object.put_acl('public_read')
+            api_client.put_object_acl(
+                ACL = 'public_read',
+                Bucket = bucket_name,
+                Key = lastKey
+            )
         end = datetime.now()
         delta = end - start
-        print "{} fichiers mis a jour. Durée : {}".format(total, delta.total_seconds())
+        print "{} fichiers mis a jour. Duree : {}".format(total, delta.total_seconds())
 
     end = datetime.now()
     delta = end - start
 
-    print "{} fichiers mis a jour, au total. Durée totale : {}".format(total, delta.total_seconds())
+    print "{} fichiers mis a jour, au total. Duree totale : {}".format(total, delta.total_seconds())
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
